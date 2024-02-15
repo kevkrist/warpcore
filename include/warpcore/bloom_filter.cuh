@@ -207,6 +207,25 @@ public:
         (keys_in, num_in, *this);
     }
 
+    /*! \brief inserts a set of keys into the bloom filter
+     * \param[in] keys_in pointer to keys to insert into the bloom filter
+     * \param[in] num_in number of keys to insert
+     * \param[in] stream CUDA stream in which this operation is executed in
+     */
+    template<typename FilterValueType>
+    HOSTQUALIFIER INLINEQUALIFIER
+    void insert_if(
+        const Key * const keys_in,
+        Filter f,
+        const FilterValueType * const values_in,
+        const index_t num_in,
+        const cudaStream_t stream = 0) noexcept
+    {
+        kernels::bloom_filter::insert_if
+        <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>
+        (keys_in, f, values_in, num_in, *this);
+    }
+
     /*! \brief retrieve a key
      * \param[in] key key to query
      * \param[in] group cooperative group

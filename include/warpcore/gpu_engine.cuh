@@ -145,6 +145,25 @@ void insert(
     }
 }
 
+template<class Core, typename Filter, typename FilterValueType>
+GLOBALQUALIFIER
+void insert_f(
+    const typename Core::key_type * const keys_in,
+    Filter f,
+    const FilterValueType * const values_in,
+    const index_t num_in,
+    Core core)
+{
+    const index_t tid = helpers::global_thread_id();
+    const index_t gid = tid / Core::cg_size();
+    const auto group =
+        cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
+
+    if(gid < num_in && f(values_in[gid]))
+    {
+        core.insert(keys_in[gid], group);
+    }
+}
 
 template<class Core>
 GLOBALQUALIFIER

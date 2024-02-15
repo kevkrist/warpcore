@@ -200,6 +200,18 @@ public:
         init(seed_, stream);
     }
 
+    /*! \brief initialize values of the hash table (for GROUP BY)
+     * \param[in] value value to initialize table values to
+     * \param[in] stream CUDA stream in which this operation is executed in
+    */
+    HOSTQUALIFIER INLINEQUALIFIER
+    void init_values(
+        const value_type value,
+        const cudaStream_t stream = 0) noexcept
+    {
+        table_.init_values(value, stream);
+    }
+
     /*! \brief inserts a key into the hash table
      * \param[in] key_in key to insert into the hash table
      * \param[in] value_in value that corresponds to \c key_in
@@ -222,6 +234,37 @@ public:
         if(group.thread_rank() == 0 && value_ptr != nullptr)
         {
             *value_ptr = value_in;
+        }
+
+        // Remove duplicate key status
+        return status - duplicate_key().status_;
+    }
+
+    /*! \brief aggregates values for given key
+     * \param[in] key_in key to insert into the hash table
+     * \param[in] value_in value that corresponds to \c key_in
+     * \param[in] atomic_aggregator atomic function to aggregate with
+     * \param[in] group cooperative group
+     * \param[in] probing_length maximum number of probing attempts
+     * \return status (per thread)
+     */
+    template<typename Atomic>
+    DEVICEQUALIFIER INLINEQUALIFIER
+    status_type insert(
+        const key_type key_in,
+        const value_type& value_in,
+        Atomic atomic_aggregator,
+        const cg::thread_block_tile<cg_size()>& group,
+        const index_type probing_length = defaults::probing_length()) noexcept
+    {
+        status_type status = status_type::unknown_error();
+
+        value_type * value_ptr =
+            insert_impl(key_in, status, group, probing_length);
+
+        if(group.thread_rank() == 0 && value_ptr != nullptr)
+        {
+            atomic_aggregator(value_ptr, value_in);
         }
 
         return status;
