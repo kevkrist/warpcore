@@ -3,9 +3,10 @@
 *.swp
 *.bak
 *.dump
+.idea
+.vs
 
 bin/
-build/
 dep/
 data/
 results/
@@ -22,5 +23,6 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 
+build/
 cmake-build-debug-visual-studio/
 out/

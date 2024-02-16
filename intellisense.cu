@@ -3,3 +3,6 @@
 //
 
 #include <warpcore/warpcore.cuh>
+#include <climits>
+
+int number = INT32_MAX;
