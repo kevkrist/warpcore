@@ -3,6 +3,7 @@
 *.swp
 *.bak
 *.dump
+.*
 
 bin/
 build/
