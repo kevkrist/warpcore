@@ -209,10 +209,12 @@ public:
 
     /*! \brief inserts a set of keys into the bloom filter
      * \param[in] keys_in pointer to keys to insert into the bloom filter
+     * \param[in] f filter to apply to values_in (e.g., a device lambda)
+     * \param[in] values_in the values to which to apply the filter
      * \param[in] num_in number of keys to insert
      * \param[in] stream CUDA stream in which this operation is executed in
      */
-    template<typename FilterValueType>
+    template<typename Filter, typename FilterValueType>
     HOSTQUALIFIER INLINEQUALIFIER
     void insert_if(
         const Key * const keys_in,
@@ -252,7 +254,7 @@ public:
             }
         }
 
-        return (group.all((slot & bloom_filter_[slot_index]) == slot)) ? true : false;
+        return (group.all((slot & bloom_filter_[slot_index]) == slot));
     }
 
     /*! \brief retrieve a set of keys
