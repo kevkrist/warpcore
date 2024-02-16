@@ -254,7 +254,7 @@ public:
             }
         }
 
-        return (group.all((slot & bloom_filter_[slot_index]) == slot)) ? true : false;
+        return (group.all((slot & bloom_filter_[slot_index]) == slot));
     }
 
     /*! \brief retrieve a set of keys
