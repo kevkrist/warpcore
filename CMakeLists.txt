@@ -77,8 +77,7 @@ set(WARPCORE_EXAMPLES_BINARY_DIR "${CMAKE_BINARY_DIR}/examples")
 option(WARPCORE_BUILD_TESTS "Configure CMake to build tests" OFF)
 option(WARPCORE_BUILD_BENCHMARKS "Configure CMake to build benchmarks" OFF)
 option(WARPCORE_BUILD_EXAMPLES "Configure CMake to build examples" OFF)
-option(WARPCORE_ENABLE_INTELLISENSE "Add dummy executable to enable
-intellisense" ON)
+option(WARPCORE_ENABLE_INTELLISENSE "Add dummy executable to enableintellisense" ON)
 
 if (WARPCORE_BUILD_TESTS)
     add_subdirectory(tests)
