@@ -8,9 +8,8 @@
   "ExpandedNodes": [
     "",
     "\\include",
-    "\\include\\warpcore",
-    "\\out"
+    "\\include\\warpcore"
   ],
-  "SelectedNode": "\\CMakeLists.txt",
+  "SelectedNode": "\\.gitignore",
   "PreviewInSolutionExplorer": false
 }
