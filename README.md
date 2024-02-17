@@ -4,15 +4,23 @@ The following modifications have been made to the base `warpcore` library in thi
 - Support for aggregations in `SingleValueHashTable` (SQL GROUP BY). Values 
   in the table must be initialized by a call to `init_values()`, where the 
   initial value must be the identity for the aggregate operation (e.g., `0` 
-  for `atomicAdd()`, `INT32_MAX` for `atomicMin()`, etc.).
-- `BloomFilter::retrieve_write` writes out the filtered input table.
-- `BloomFilter::insert_if` inserts into the bloom filter if a corresponding 
+  for `atomicAdd()`, `INT32_MAX` for `atomicMin()`, etc.). The `atomic_
+  aggregator` functor argument has signature `atomic_aggregator(value_type* 
+  value_address, value_type value_to_aggregate)`.
+- `BloomFilter::retrieve_write()` writes out the filtered input table. The 
+  `writer` functor argument has signature `writer(int write_index, 
+  int read_index)`.
+- `BloomFilter::insert_if()` inserts into the bloom filter if a corresponding 
   values passes a predicate (SQL WHERE).
-- `BloomFilter::retrieve_write_if` and `BloomFilter::retrieve_if` are defined similarly.
-- `SingleValueHashTable::retrieve_write` is implemented.
+- `BloomFilter::retrieve_write_if()` and `BloomFilter::retrieve_if()` are 
+  defined similarly.
+- `SingleValueHashTable::retrieve_write()` and 
+  `SingleValueHashTable::retrieve_write_if()` are also implemented.
 
 The goal is to eliminate the need to write custom kernels for hash table 
-operations curated for a specific SQL query.
+operations curated for a specific SQL query. The exception is hash join 
+pipelining, but I have found that in cases of high selectivity, the thread 
+divergence caused by pipelining is not amortized by the lack of materialization.
 
 Below you will find the original README.
 

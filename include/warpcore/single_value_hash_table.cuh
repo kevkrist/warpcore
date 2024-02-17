@@ -330,13 +330,15 @@ class SingleValueHashTable {
         keys_in, num_in, values_out, *this, probing_length, status_out);
   }
 
-  /*! \brief retrieve a set of keys from the hash table
+  /*! \brief retrieve a set of keys from the hash table and write out corresponding values
    * \tparam StatusHandler handles returned status per key (see \c status_handlers)
    * \param[in] keys_in pointer to keys to retrieve from the hash table
    * \param[in] num_in number of keys to retrieve
    * \param[out] keys_out keys retrieved from the hash table
    * \param[out] values_out retrieved values
-   * \param[out] num_out number of pairs retrieved
+   * \param[out] counter counter of keys and values retrieved (pointer with reference initialized
+   * to zero)
+   * \param[in] writer device functor or lambda for writing out additional table columns
    * \param[in] stream CUDA stream in which this operation is executed in
    * \param[in] probing_length maximum number of probing attempts
    * \param[out] status_out status information (per key)
@@ -360,6 +362,58 @@ class SingleValueHashTable {
     kernels::retrieve<SingleValueHashTable, Writer, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
         keys_in, num_in, keys_out, values_out, counter, writer, *this, probing_length, status_out);
+  }
+
+  /*! \brief retrieve a set of keys from the hash table and write out corresponding values if
+   * filter is passed
+   * \tparam StatusHandler handles returned status per key (see \c status_handlers)
+   * \param[in] keys_in pointer to keys to retrieve from the hash table
+   * \param[in] f boolean predicate functor to apply to filter values
+   * \param[in] filter_values values to which to apply f
+   * \param[in] num_in number of keys to retrieve
+   * \param[out] keys_out keys retrieved from the hash table
+   * \param[out] values_out retrieved values
+   * \param[out] counter counter of keys and values retrieved (pointer with reference initialized
+   * to zero)
+   * \param[in] writer device functor or lambda for writing out additional table columns
+   * \param[in] stream CUDA stream in which this operation is executed in
+   * \param[in] probing_length maximum number of probing attempts
+   * \param[out] status_out status information (per key)
+   */
+  template <typename Filter,
+            typename FilterValueType,
+            typename Writer,
+            class StatusHandler = defaults::status_handler_t>
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write_if(
+    const key_type* const keys_in,
+    Filter f,
+    FilterValueType* filter_values,
+    const index_type num_in,
+    key_type* const keys_out,
+    value_type* const values_out,
+    int* counter,
+    Writer writer,
+    cudaStream_t stream                                 = cudaStreamDefault,
+    const index_type probing_length                     = defaults::probing_length(),
+    typename StatusHandler::base_type* const status_out = nullptr) const noexcept
+  {
+    static_assert(checks::is_status_handler<StatusHandler>(), "not a valid status handler type");
+
+    if (!is_initialized_) return;
+
+    kernels::retrieve<SingleValueHashTable, Filter, FilterValueType, Writer, StatusHandler>
+      <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
+        keys_in,
+        f,
+        filter_values,
+        num_in,
+        keys_out,
+        values_out,
+        counter,
+        writer,
+        *this,
+        probing_length,
+        status_out);
   }
 
   /*! \brief retrieves all elements from the hash table
