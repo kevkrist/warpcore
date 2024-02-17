@@ -1,10 +1,20 @@
 # WARPCORE
 
 The following modifications have been made to the base `warpcore` library in this fork:
-- Support for aggregations in `SingleValueHashTable` (SQL GROUP BY). Values in the table must be initialized by a call to `init_values`, where the initial value must be the identity for the aggregate operation (e.g., `0` for `atomicAdd()`, `INT32_MAX` for `atomicMin()`).
+- Support for aggregations in `SingleValueHashTable` (SQL GROUP BY). Values 
+  in the table must be initialized by a call to `init_values()`, where the 
+  initial value must be the identity for the aggregate operation (e.g., `0` 
+  for `atomicAdd()`, `INT32_MAX` for `atomicMin()`, etc.).
 - `BloomFilter::retrieve_write` writes out the filtered input table.
-- `BloomFilter::insert_if` inserts into the bloom filter if a corresponding set of values passes a predicate filter (SQL WHERE).
+- `BloomFilter::insert_if` inserts into the bloom filter if a corresponding 
+  values passes a predicate (SQL WHERE).
 - `BloomFilter::retrieve_write_if` and `BloomFilter::retrieve_if` are defined similarly.
+- `SingleValueHashTable::retrieve_write` is implemented.
+
+The goal is to eliminate the need to write custom kernels for hash table 
+operations curated for a specific SQL query.
+
+Below you will find the original README.
 
 **Hashing at the speed of light on modern CUDA-accelerators**
 
