@@ -150,7 +150,7 @@ class SingleValueHashTable {
    * \param[in] stream CUDA stream in which this operation is executed in
    */
   HOSTQUALIFIER INLINEQUALIFIER void init(const key_type seed,
-                                          const cudaStream_t stream = 0) noexcept
+                                          cudaStream_t stream = cudaStreamDefault) noexcept
   {
     is_initialized_ = false;
 
@@ -167,7 +167,7 @@ class SingleValueHashTable {
   /*! \brief (re)initialize the hash table
    * \param[in] stream CUDA stream in which this operation is executed in
    */
-  HOSTQUALIFIER INLINEQUALIFIER void init(const cudaStream_t stream = 0) noexcept
+  HOSTQUALIFIER INLINEQUALIFIER void init(cudaStream_t stream = cudaStreamDefault) noexcept
   {
     init(seed_, stream);
   }
@@ -177,7 +177,7 @@ class SingleValueHashTable {
    * \param[in] stream CUDA stream in which this operation is executed in
    */
   HOSTQUALIFIER INLINEQUALIFIER void init_values(const value_type value,
-                                                 const cudaStream_t stream = 0) noexcept
+                                                 cudaStream_t stream = cudaStreamDefault) noexcept
   {
     table_.init_values(value, stream);
   }
@@ -202,10 +202,10 @@ class SingleValueHashTable {
     if (group.thread_rank() == 0 && value_ptr != nullptr) { *value_ptr = value_in; }
 
     // Remove duplicate key status
-    return status - duplicate_key().status_;
+    return status - warpcore::Status::duplicate_key();
   }
 
-  /*! \brief aggregates values for given key
+  /*! \brief aggregates values for given key (values must be properly initialized)
    * \param[in] key_in key to insert into the hash table
    * \param[in] value_in value that corresponds to \c key_in
    * \param[in] atomic_aggregator device lambda wrapping atomic function to aggregate with
@@ -246,7 +246,7 @@ class SingleValueHashTable {
     const key_type* const keys_in,
     const value_type* const values_in,
     const index_type num_in,
-    const cudaStream_t stream                           = 0,
+    cudaStream_t stream                                 = cudaStreamDefault,
     const index_type probing_length                     = defaults::probing_length(),
     typename StatusHandler::base_type* const status_out = nullptr) noexcept
   {
@@ -317,7 +317,7 @@ class SingleValueHashTable {
     const key_type* const keys_in,
     const index_type num_in,
     value_type* const values_out,
-    const cudaStream_t stream                           = 0,
+    cudaStream_t stream                                 = cudaStreamDefault,
     const index_type probing_length                     = defaults::probing_length(),
     typename StatusHandler::base_type* const status_out = nullptr) const noexcept
   {
@@ -341,14 +341,15 @@ class SingleValueHashTable {
    * \param[in] probing_length maximum number of probing attempts
    * \param[out] status_out status information (per key)
    */
-  template <class StatusHandler = defaults::status_handler_t>
-  HOSTQUALIFIER INLINEQUALIFIER void retrieve(
+  template <typename Writer, class StatusHandler = defaults::status_handler_t>
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write(
     const key_type* const keys_in,
     const index_type num_in,
     key_type* const keys_out,
     value_type* const values_out,
-    index_type& num_out,
-    const cudaStream_t stream                           = 0,
+    int* counter,
+    Writer writer,
+    cudaStream_t stream                                 = cudaStreamDefault,
     const index_type probing_length                     = defaults::probing_length(),
     typename StatusHandler::base_type* const status_out = nullptr) const noexcept
   {
@@ -356,17 +357,9 @@ class SingleValueHashTable {
 
     if (!is_initialized_) return;
 
-    index_type* tmp = temp_.get();
-
-    cudaMemsetAsync(tmp, 0, sizeof(index_type), stream);
-
-    kernels::retrieve<SingleValueHashTable, StatusHandler>
+    kernels::retrieve<SingleValueHashTable, Writer, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
-        keys_in, num_in, keys_out, values_out, tmp, *this, probing_length, status_out);
-
-    cudaMemcpyAsync(&num_out, tmp, sizeof(index_type), D2H);
-
-    if (stream == 0) { cudaStreamSynchronize(stream); }
+        keys_in, num_in, keys_out, values_out, counter, writer, *this, probing_length, status_out);
   }
 
   /*! \brief retrieves all elements from the hash table
@@ -375,10 +368,11 @@ class SingleValueHashTable {
    * \param[out] num_out number of of key/value pairs retrieved
    * \param[in] stream CUDA stream in which this operation is executed in
    */
-  HOSTQUALIFIER INLINEQUALIFIER void retrieve_all(key_type* const keys_out,
-                                                  value_type* const values_out,
-                                                  index_type& num_out,
-                                                  const cudaStream_t stream = 0) const noexcept
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_all(
+    key_type* const keys_out,
+    value_type* const values_out,
+    index_type& num_out,
+    cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     if (!is_initialized_) return;
 
@@ -396,7 +390,7 @@ class SingleValueHashTable {
 
     cudaMemcpyAsync(&num_out, tmp, sizeof(index_type), D2H);
 
-    if (stream == 0) { cudaStreamSynchronize(stream); }
+    if (stream == cudaStreamDefault) { cudaStreamSynchronize(stream); }
   }
 
   /*! \brief erases a key from the hash table
@@ -454,7 +448,7 @@ class SingleValueHashTable {
   HOSTQUALIFIER INLINEQUALIFIER void erase(
     const key_type* const keys_in,
     const index_type num_in,
-    const cudaStream_t stream                           = 0,
+    cudaStream_t stream                                 = cudaStreamDefault,
     const index_type probing_length                     = defaults::probing_length(),
     typename StatusHandler::base_type* const status_out = nullptr) noexcept
   {
@@ -467,7 +461,7 @@ class SingleValueHashTable {
         keys_in, num_in, *this, probing_length, status_out);
   }
 
-  /*! \brief applies a funtion over all key value pairs inside the table
+  /*! \brief applies a function over all key value pairs inside the table
    * \tparam Func type of map i.e. CUDA device lambda
    * \param[in] f map to apply
    * \param[in] stream CUDA stream in which this operation is executed in
@@ -475,7 +469,7 @@ class SingleValueHashTable {
    */
   template <class Func>
   HOSTQUALIFIER INLINEQUALIFIER void for_each(Func f,  // TODO const?
-                                              const cudaStream_t stream   = 0,
+                                              cudaStream_t stream         = cudaStreamDefault,
                                               const index_type smem_bytes = 0) const noexcept
   {
     if (!is_initialized_) return;
@@ -497,7 +491,8 @@ class SingleValueHashTable {
    * \param[in] stream CUDA stream in which this operation is executed in
    * \return the number of key/value pairs inside the hash table
    */
-  HOSTQUALIFIER INLINEQUALIFIER index_type size(const cudaStream_t stream = 0) const noexcept
+  HOSTQUALIFIER INLINEQUALIFIER index_type
+  size(cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     if (!is_initialized_) return 0;
 
@@ -545,7 +540,8 @@ class SingleValueHashTable {
    * \param stream CUDA stream in which this operation is executed in
    * \return load factor
    */
-  HOSTQUALIFIER INLINEQUALIFIER float load_factor(const cudaStream_t stream = 0) const noexcept
+  HOSTQUALIFIER INLINEQUALIFIER float load_factor(
+    cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     return float(size(stream)) / float(capacity());
   }
@@ -554,7 +550,8 @@ class SingleValueHashTable {
    * \param stream CUDA stream in which this operation is executed in
    * \return storage density
    */
-  HOSTQUALIFIER INLINEQUALIFIER float storage_density(const cudaStream_t stream = 0) const noexcept
+  HOSTQUALIFIER INLINEQUALIFIER float storage_density(
+    cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     return load_factor(stream);
   }
@@ -588,7 +585,7 @@ class SingleValueHashTable {
    * \return the status
    */
   HOSTQUALIFIER INLINEQUALIFIER status_type
-  peek_status(const cudaStream_t stream = 0) const noexcept
+  peek_status(cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     status_type status = status_type::not_initialized();
 
@@ -605,7 +602,8 @@ class SingleValueHashTable {
    * \param[in] stream CUDA stream in which this operation is executed in
    * \return the status
    */
-  HOSTQUALIFIER INLINEQUALIFIER status_type pop_status(const cudaStream_t stream = 0) noexcept
+  HOSTQUALIFIER INLINEQUALIFIER status_type
+  pop_status(cudaStream_t stream = cudaStreamDefault) noexcept
   {
     status_type status = status_type::not_initialized();
 
@@ -740,8 +738,8 @@ class SingleValueHashTable {
    * \param[in] status new status
    * \param[in] stream CUDA stream in which this operation is executed in
    */
-  HOSTQUALIFIER INLINEQUALIFIER void assign_status(const status_type status,
-                                                   const cudaStream_t stream = 0) const noexcept
+  HOSTQUALIFIER INLINEQUALIFIER void assign_status(
+    const status_type status, cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     if (status_ != nullptr) {
       cudaMemcpyAsync(status_, &status, sizeof(status_type), H2D, stream);
@@ -754,8 +752,8 @@ class SingleValueHashTable {
    * \param[in] status new status
    * \param[in] stream CUDA stream in which this operation is executed in
    */
-  HOSTQUALIFIER INLINEQUALIFIER void join_status(const status_type status,
-                                                 const cudaStream_t stream = 0) const noexcept
+  HOSTQUALIFIER INLINEQUALIFIER void join_status(
+    const status_type status, cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     if (status_ != nullptr) {
       const status_type joined = peek_status(stream) + status;

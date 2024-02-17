@@ -10,6 +10,5 @@
 #include "multi_bucket_hash_table.cuh"
 #include "bucket_list_hash_table.cuh"
 #include "random_distributions.cuh"
-#include "in_out.cuh"
 
 #endif /* WARPCORE_CUH */

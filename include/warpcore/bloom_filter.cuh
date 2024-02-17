@@ -123,7 +123,7 @@ class BloomFilter {
    * \param[in] stream CUDA stream in which this operation is executed in
    */
   HOSTQUALIFIER INLINEQUALIFIER void init(const key_type seed,
-                                          const cudaStream_t stream = 0) noexcept
+                                          cudaStream_t stream = cudaStreamDefault) noexcept
   {
     seed_ = seed;
 
@@ -134,7 +134,7 @@ class BloomFilter {
   /*! \brief (re)initialize the hash table
    * \param[in] stream CUDA stream in which this operation is executed in
    */
-  HOSTQUALIFIER INLINEQUALIFIER void init(const cudaStream_t stream = 0) noexcept
+  HOSTQUALIFIER INLINEQUALIFIER void init(cudaStream_t stream = cudaStreamDefault) noexcept
   {
     init(seed_, stream);
   }
@@ -169,7 +169,7 @@ class BloomFilter {
    */
   HOSTQUALIFIER INLINEQUALIFIER void insert(const Key* const keys_in,
                                             const index_t num_in,
-                                            const cudaStream_t stream = 0) noexcept
+                                            cudaStream_t stream = cudaStreamDefault) noexcept
   {
     kernels::bloom_filter::
       insert<<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
@@ -188,7 +188,7 @@ class BloomFilter {
                                                Filter f,
                                                const FilterValueType* const values_in,
                                                const index_t num_in,
-                                               const cudaStream_t stream = 0) noexcept
+                                               cudaStream_t stream = cudaStreamDefault) noexcept
   {
     kernels::bloom_filter::
       insert_if<<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
@@ -225,10 +225,11 @@ class BloomFilter {
    * \param[out] flags_out result per key
    * \param[in] stream CUDA stream in which this operation is executed in
    */
-  HOSTQUALIFIER INLINEQUALIFIER void retrieve(const key_type* const keys_in,
-                                              const index_type num_in,
-                                              bool* const flags_out,
-                                              const cudaStream_t stream = 0) const noexcept
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve(
+    const key_type* const keys_in,
+    const index_type num_in,
+    bool* const flags_out,
+    cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     kernels::bloom_filter::
       retrieve<<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
@@ -240,22 +241,23 @@ class BloomFilter {
    * \param[in] num_in number of keys
    * \param[out] keys_out pointer to keys that passed the filter
    * \param[inout] counter counter for the number of keys that pass the filter
+   * \param[inout] writer write functor / device lambda for reading/writing columns
    * \param[in] stream CUDA stream in which this operation is executed in
-   * \param[inout] columns variable number of columns to read/write
    */
-  template <typename... Columns>
-  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write(const key_type* const keys_in,
-                                                    const index_type num_in,
-                                                    key_type* keys_out,
-                                                    int* counter,
-                                                    const cudaStream_t stream,
-                                                    Columns... columns) const noexcept
+  template <typename Writer>
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write(
+    const key_type* const keys_in,
+    const index_type num_in,
+    key_type* keys_out,
+    int* counter,
+    Writer writer,
+    cudaStream_t stream = cudaStreamDefault) const noexcept
   {
     kernels::bloom_filter::retrieve_write<<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE),
                                             WARPCORE_BLOCKSIZE,
                                             0,
                                             stream>>>(
-      keys_in, num_in, keys_out, counter, *this, columns);
+      keys_in, num_in, keys_out, counter, writer, *this);
   }
 
   /*! \brief retrieve a set of keys predicated on a filter, and write filtered output out
@@ -265,32 +267,32 @@ class BloomFilter {
    * \param[in] num_in number of keys
    * \param[out] keys_out pointer to keys that passed the filter
    * \param[inout] counter counter for the number of keys that pass the filter
+   * \param[inout] writer write functor / device lambda for reading/writing columns
    * \param[in] stream CUDA stream in which this operation is executed in
-   * \param[inout] columns variable number of columns to read/write
    */
-  template <typename Filter, typename FilterValueType, typename... Columns>
-  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write_if(const key_type* const keys_in,
-                                                       Filter f,
-                                                       FilterValueType* filter_values,
-                                                       const index_type num_in,
-                                                       key_type* keys_out,
-                                                       int* counter,
-                                                       const cudaStream_t stream,
-                                                       Columns... columns) const noexcept
+  template <typename Filter, typename FilterValueType, typename Writer>
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write_if(
+    const key_type* const keys_in,
+    Filter f,
+    FilterValueType* filter_values,
+    const index_type num_in,
+    key_type* keys_out,
+    int* counter,
+    Writer writer,
+    cudaStream_t stream = cudaStreamDefault) const noexcept
   {
-    kernels::bloom_filter::retrieve_write_iff<<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE),
-                                                WARPCORE_BLOCKSIZE,
-                                                0,
-                                                stream>>>(
-      keys_in, f, filter_values, num_in, keys_out, counter, *this, columns);
+    kernels::bloom_filter::retrieve_write_if<<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE),
+                                               WARPCORE_BLOCKSIZE,
+                                               0,
+                                               stream>>>(
+      keys_in, f, filter_values, num_in, keys_out, counter, writer, *this);
   }
 
   /*! \brief queries and subsequently inserts a key into the bloom filter
    * \note can only be used when \c CGSize==1 to prevent from race conditions
    * \param[in] key key to query
    * \param[in] group cooperative group this operation is executed in
-   * \param[out] flag whether the key was already inside the filter before
-   * insertion
+   * \param[out] flag whether the key was already inside the filter before insertion
    */
   template <index_type CGSize_ = cg_size(), class = std::enable_if_t<CGSize_ == 1>>
   DEVICEQUALIFIER INLINEQUALIFIER bool insert_and_query(

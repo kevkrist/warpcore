@@ -124,13 +124,13 @@ GLOBALQUALIFIER void retrieve(const typename Core::key_type* const keys_in,
   }
 }
 
-template <class Core, typename... Columns>
+template <class Core, typename Writer>
 GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in,
                                     const index_t num_in,
                                     typename Core::key_type* keys_out,
                                     int* counter,
-                                    const Core core,
-                                    Columns... columns)
+                                    Writer writer,
+                                    const Core core)
 {
   const index_t tid = blockDim.x * blockIdx.x + threadIdx.x;
   const index_t gid = tid / Core::cg_size();
@@ -142,21 +142,21 @@ GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in
       if (group.thread_rank() == 0) {
         auto write_index      = helpers::atomicAggInc(counter);
         keys_out[write_index] = key;
-        (..., (columns.out[write_index] = columns.in[gid]));
+        writer(write_index, gid);
       }
     }
   }
 }
 
-template <class Core, typename Filter, typename FilterTypeValue, typename... Columns>
+template <class Core, typename Filter, typename FilterTypeValue, typename Writer>
 GLOBALQUALIFIER void retrieve_write_if(const typename Core::key_type* const keys_in,
                                        Filter f,
                                        const FilterTypeValue* const filter_values,
                                        const index_t num_in,
                                        typename Core::key_type* keys_out,
                                        int* counter,
-                                       const Core core,
-                                       Columns... columns)
+                                       Writer writer,
+                                       const Core core)
 {
   const index_t tid = blockDim.x * blockIdx.x + threadIdx.x;
   const index_t gid = tid / Core::cg_size();
@@ -168,7 +168,7 @@ GLOBALQUALIFIER void retrieve_write_if(const typename Core::key_type* const keys
       if (group.thread_rank() == 0) {
         auto write_index      = helpers::atomicAggInc(counter);
         keys_out[write_index] = key;
-        (..., (columns.out[write_index] = columns.in[gid]));
+        writer(write_index, gid);
       }
     }
   }
@@ -238,47 +238,39 @@ GLOBALQUALIFIER void retrieve(const typename Core::key_type* const keys_in,
   }
 }
 
-/*
-template<class Core, class StatusHandler>
-GLOBALQUALIFIER
-void retrieve(
-                const typename Core::key_type * const keys_in,
-                const index_t num_in,
-                typename Core::key_type * const keys_out,
-                typename Core::value_type * const values_out,
-                index_t * const num_out,
-                const index_t probing_length,
-                const Core core,
-                typename StatusHandler::base_type * const status_out)
+template <class Core, typename Writer, class StatusHandler = defaults::status_handler_t>
+GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in,
+                                    const index_t num_in,
+                                    typename Core::key_type* const keys_out,
+                                    typename Core::value_type* const values_out,
+                                    int* counter,
+                                    Writer writer,
+                                    const Core core,
+                                    const index_t probing_length = defaults::probing_length(),
+                                    typename StatusHandler::base_type* const status_out = nullptr)
 {
-                const index_t tid = helpers::global_thread_id();
-                const index_t gid = tid / Core::cg_size();
-                const auto group =
-                                cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
+  const index_t tid = helpers::global_thread_id();
+  const index_t gid = tid / Core::cg_size();
+  const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
 
-                if(gid < num_in)
-                {
-                                const typename Core::key_type key_in =
-keys_in[gid]; typename Core::value_type value_out;
+  if (gid < num_in) {
+    typename Core::value_type value_out;
 
-                                const auto status =
-                                                core.retrieve(key_in, value_out,
-group, probing_length);
+    const auto key    = keys_in[gid];
+    const auto status = core.retrieve(key, value_out, group, probing_length);
 
-                                if(group.thread_rank() == 0)
-                                {
-                                                if(!status.has_any())
-                                                {
-                                                                const auto i =
-helpers::atomicAggInc(num_out); keys_out[i] = key_in; values_out[i] = value_out;
-                                                }
+    if (group.thread_rank() == 0) {
+      if (!status.has_any()) {
+        auto write_index        = helpers::atomicAggInc(counter);
+        keys_out[write_index]   = key;
+        values_out[write_index] = value_out;
+        writer(write_index, gid);
+      }
 
-                                                StatusHandler::handle(status,
-status_out, gid);
-                                }
-                }
+      StatusHandler::handle(status, status_out, gid);
+    }
+  }
 }
-*/
 
 template <class Core, class StatusHandler = defaults::status_handler_t>
 GLOBALQUALIFIER void retrieve(const typename Core::key_type* const keys_in,
