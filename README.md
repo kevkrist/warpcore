@@ -16,6 +16,9 @@ The following modifications have been made to the base `warpcore` library in thi
   defined similarly.
 - `SingleValueHashTable::retrieve_write()` and 
   `SingleValueHashTable::retrieve_write_if()` are also implemented.
+- `HashSet::insert_if()` is implemented.
+- TODO: `SingleValueHashTable::insert_if()`, `HashSet::retrieve_write()`, 
+  `HashSet::retrieve_write_if()`.
 
 The goal is to eliminate the need to write custom kernels for hash table 
 operations curated for a specific SQL query. The exception is hash join 
