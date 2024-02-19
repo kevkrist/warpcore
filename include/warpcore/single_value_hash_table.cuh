@@ -206,6 +206,7 @@ class SingleValueHashTable {
   }
 
   /*! \brief aggregates values for given key (values must be properly initialized)
+   * \tparam Atomic the functor wrapper for the atomic operation to perform for aggregation
    * \param[in] key_in key to insert into the hash table
    * \param[in] value_in value that corresponds to \c key_in
    * \param[in] atomic_aggregator device lambda wrapping atomic function to aggregate with
@@ -257,6 +258,68 @@ class SingleValueHashTable {
     kernels::insert<SingleValueHashTable, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
         keys_in, values_in, num_in, *this, probing_length, status_out);
+  }
+
+  /*! \brief insert a set of keys into the hash table, subject to a filter on the input values
+   * \tparam Filter the filter functor to apply to values_in
+   * \tparam StatusHandler handles returned status per key (see \c status_handlers)
+   * \param[in] keys_in pointer to keys to insert into the hash table
+   * \param[in] values_in corresponds values to \c keys_in
+   * \param[in] f filter to apply to values_in
+   * \param[in] num_in number of keys to insert
+   * \param[in] stream CUDA stream in which this operation is executed in
+   * \param[in] probing_length maximum number of probing attempts
+   * \param[out] status_out status information per key
+   */
+  template <typename Filter, class StatusHandler = defaults::status_handler_t>
+  HOSTQUALIFIER INLINEQUALIFIER void insert_if(
+    const key_type* const keys_in,
+    const value_type* const values_in,
+    Filter f,
+    const index_type num_in,
+    cudaStream_t stream                                 = cudaStreamDefault,
+    const index_type probing_length                     = defaults::probing_length(),
+    typename StatusHandler::base_type* const status_out = nullptr) noexcept
+  {
+    static_assert(checks::is_status_handler<StatusHandler>(), "not a valid status handler type");
+
+    if (!is_initialized_) return;
+
+    kernels::insert_if<SingleValueHashTable, Filter, StatusHandler>
+      <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
+        keys_in, values_in, f, num_in, *this, probing_length, status_out);
+  }
+
+  /*! \brief insert a set of keys into the hash table, subject to a filter on external values
+   * \tparam Filter the filter functor to apply to filter_values
+   * \tparam FilterType the type of filter_values
+   * \tparam StatusHandler handles returned status per key (see \c status_handlers)
+   * \param[in] keys_in pointer to keys to insert into the hash table
+   * \param[in] values_in corresponds values to \c keys_in
+   * \param[in] f filter to apply to values_in
+   * \param[in] num_in number of keys to insert
+   * \param[in] stream CUDA stream in which this operation is executed in
+   * \param[in] probing_length maximum number of probing attempts
+   * \param[out] status_out status information per key
+   */
+  template <typename Filter, typename FilterType, class StatusHandler = defaults::status_handler_t>
+  HOSTQUALIFIER INLINEQUALIFIER void insert_if(
+    const key_type* const keys_in,
+    const value_type* const values_in,
+    Filter f,
+    FilterType* filter_values,
+    const index_type num_in,
+    cudaStream_t stream                                 = cudaStreamDefault,
+    const index_type probing_length                     = defaults::probing_length(),
+    typename StatusHandler::base_type* const status_out = nullptr) noexcept
+  {
+    static_assert(checks::is_status_handler<StatusHandler>(), "not a valid status handler type");
+
+    if (!is_initialized_) return;
+
+    kernels::insert_if<SingleValueHashTable, Filter, FilterType, StatusHandler>
+      <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
+        keys_in, values_in, f, filter_values, num_in, *this, probing_length, status_out);
   }
 
   /*! \brief retrieves a key from the hash table
@@ -331,6 +394,7 @@ class SingleValueHashTable {
   }
 
   /*! \brief retrieve a set of keys from the hash table and write out corresponding values
+   * \tparam Writer functor / device lambda for writing column values out
    * \tparam StatusHandler handles returned status per key (see \c status_handlers)
    * \param[in] keys_in pointer to keys to retrieve from the hash table
    * \param[in] num_in number of keys to retrieve
@@ -366,6 +430,9 @@ class SingleValueHashTable {
 
   /*! \brief retrieve a set of keys from the hash table and write out corresponding values if
    * filter is passed
+   * \tparam Filter the filter functor to apply to filter_values
+   * \tparam FilterValueType the type of filter_values
+   * \tparam Writer the functor type for writing out additional columns
    * \tparam StatusHandler handles returned status per key (see \c status_handlers)
    * \param[in] keys_in pointer to keys to retrieve from the hash table
    * \param[in] f boolean predicate functor to apply to filter values
@@ -373,9 +440,8 @@ class SingleValueHashTable {
    * \param[in] num_in number of keys to retrieve
    * \param[out] keys_out keys retrieved from the hash table
    * \param[out] values_out retrieved values
-   * \param[out] counter counter of keys and values retrieved (pointer with reference initialized
-   * to zero)
-   * \param[in] writer device functor or lambda for writing out additional table columns
+   * \param[out] counter counter of keys and values retrieved (initialize reference to zero)
+   * \param[in] writer device functor instance or lambda for writing out additional columns
    * \param[in] stream CUDA stream in which this operation is executed in
    * \param[in] probing_length maximum number of probing attempts
    * \param[out] status_out status information (per key)

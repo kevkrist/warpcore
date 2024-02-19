@@ -177,6 +177,8 @@ class BloomFilter {
   }
 
   /*! \brief inserts a set of keys into the bloom filter
+   * \tparam Filter the functor type for the filter
+   * \tparam FilterValueType the type of the values to filter
    * \param[in] keys_in pointer to keys to insert into the bloom filter
    * \param[in] f filter to apply to values_in (e.g., a device lambda)
    * \param[in] values_in the values to which to apply the filter
@@ -237,11 +239,12 @@ class BloomFilter {
   }
 
   /*! \brief retrieve a set of keys, and write filtered output out
+   * \tparam Writer the functor type for writing out additional columns
    * \param[in] keys_in pointer to keys
    * \param[in] num_in number of keys
    * \param[out] keys_out pointer to keys that passed the filter
    * \param[inout] counter counter for the number of keys that pass the filter
-   * \param[inout] writer write functor / device lambda for reading/writing columns
+   * \param[inout] writer write functor / device lambda for reading/writing additional columns
    * \param[in] stream CUDA stream in which this operation is executed in
    */
   template <typename Writer>
@@ -261,13 +264,16 @@ class BloomFilter {
   }
 
   /*! \brief retrieve a set of keys predicated on a filter, and write filtered output out
+   * \tparam Filter the functor type of the filter
+   * \tparam FilterValueType the type of the filtered values
+   * \tparam Writer the functor type for writing out additional columns
    * \param[in] keys_in pointer to keys
    * \param[in] f filter on filter values
    * \param[in] filter_values values to which to apply filter
    * \param[in] num_in number of keys
    * \param[out] keys_out pointer to keys that passed the filter
    * \param[inout] counter counter for the number of keys that pass the filter
-   * \param[inout] writer write functor / device lambda for reading/writing columns
+   * \param[inout] writer write functor / device lambda for reading/writing additional columns
    * \param[in] stream CUDA stream in which this operation is executed in
    */
   template <typename Filter, typename FilterValueType, typename Writer>
