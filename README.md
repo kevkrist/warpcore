@@ -7,9 +7,8 @@ The following modifications have been made to the base `warpcore` library in thi
   for `atomicAdd()`, `INT32_MAX` for `atomicMin()`, etc.). The `atomic_
   aggregator` functor argument has signature `atomic_aggregator(value_type* 
   value_address, value_type value_to_aggregate)`.
-- `BloomFilter::retrieve_write()` writes out the filtered input table. The 
-  `writer` functor argument has signature `writer(int write_index, 
-  int read_index)`.
+- `BloomFilter::retrieve_write()` writes out the filtered input table. 
+- In general, the `writer` functor argument has signature `writer(int write_index, int read_index, [HashTableValueType hash_table_value, FilterValueType filter_value])`, depending on the hash table type and retrieval type.
 - `BloomFilter::insert_if()` inserts into the bloom filter if a corresponding 
   values passes a predicate (SQL WHERE).
 - `BloomFilter::retrieve_write_if()` and `BloomFilter::retrieve_if()` are 

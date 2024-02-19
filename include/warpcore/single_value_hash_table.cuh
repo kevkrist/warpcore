@@ -398,8 +398,6 @@ class SingleValueHashTable {
    * \tparam StatusHandler handles returned status per key (see \c status_handlers)
    * \param[in] keys_in pointer to keys to retrieve from the hash table
    * \param[in] num_in number of keys to retrieve
-   * \param[out] keys_out keys retrieved from the hash table
-   * \param[out] values_out retrieved values
    * \param[out] counter counter of keys and values retrieved (pointer with reference initialized
    * to zero)
    * \param[in] writer device functor or lambda for writing out additional table columns
@@ -411,8 +409,6 @@ class SingleValueHashTable {
   HOSTQUALIFIER INLINEQUALIFIER void retrieve_write(
     const key_type* const keys_in,
     const index_type num_in,
-    key_type* const keys_out,
-    value_type* const values_out,
     int* counter,
     Writer writer,
     cudaStream_t stream                                 = cudaStreamDefault,
@@ -423,9 +419,9 @@ class SingleValueHashTable {
 
     if (!is_initialized_) return;
 
-    kernels::retrieve<SingleValueHashTable, Writer, StatusHandler>
+    kernels::retrieve_write<SingleValueHashTable, Writer, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
-        keys_in, num_in, keys_out, values_out, counter, writer, *this, probing_length, status_out);
+        keys_in, num_in, counter, writer, *this, probing_length, status_out);
   }
 
   /*! \brief retrieve a set of keys from the hash table and write out values subject to filter
@@ -437,8 +433,6 @@ class SingleValueHashTable {
    * \param[in] f predicate functor instance to apply to filter values
    * \param[in] filter_values values to which to apply f
    * \param[in] num_in number of keys to retrieve
-   * \param[out] keys_out keys retrieved from the hash table
-   * \param[out] values_out retrieved values
    * \param[out] counter counter of keys and values retrieved (initialize reference to zero)
    * \param[in] writer device functor instance or lambda for writing out additional columns
    * \param[in] stream CUDA stream in which this operation is executed in
@@ -454,8 +448,6 @@ class SingleValueHashTable {
     Filter f,
     const FilterValueType* const filter_values,
     const index_type num_in,
-    key_type* const keys_out,
-    value_type* const values_out,
     int* counter,
     Writer writer,
     cudaStream_t stream                                 = cudaStreamDefault,
@@ -466,14 +458,12 @@ class SingleValueHashTable {
 
     if (!is_initialized_) return;
 
-    kernels::retrieve<SingleValueHashTable, Filter, FilterValueType, Writer, StatusHandler>
+    kernels::retrieve_write_if<SingleValueHashTable, Filter, FilterValueType, Writer, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
         keys_in,
         f,
         filter_values,
         num_in,
-        keys_out,
-        values_out,
         counter,
         writer,
         *this,

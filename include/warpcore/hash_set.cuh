@@ -348,7 +348,6 @@ class HashSet {
    * \tparam StatusHandler handles returned status per key (see \c status_handlers)
    * \param[in] keys_in pointer to keys to retrieve from the hash table
    * \param[in] num_in number of keys to retrieve
-   * \param[out] keys_out keys retrieved from the hash table
    * \param[in] counter counter of keys retrieved
    * \param[in] writer Writer instance for writing column values out
    * \param[in] stream CUDA stream in which this operation is executed in
@@ -359,7 +358,6 @@ class HashSet {
   HOSTQUALIFIER INLINEQUALIFIER void retrieve_write(
     const key_type* keys_in,
     const index_type num_in,
-    key_type* keys_out,
     int* counter,
     Writer writer,
     cudaStream_t stream                           = cudaStreamDefault,
@@ -372,7 +370,7 @@ class HashSet {
 
     kernels::hash_set::retrieve_write<HashSet, Writer, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
-        keys_in, num_in, keys_out, counter, writer, *this, probing_length, status_out);
+        keys_in, num_in, counter, writer, *this, probing_length, status_out);
   }
 
   /*! \brief retrieve a set of keys from the hash table and write out values subject to filter
@@ -384,8 +382,6 @@ class HashSet {
    * \param[in] f predicate functor instance to apply to filter values
    * \param[in] filter_values_in values to which to apply f
    * \param[in] num_in number of keys to retrieve
-   * \param[out] keys_out keys retrieved from the hash table
-   * \param[out] filter_values_out filter values corresponding to matched keys
    * \param[in] counter counter of keys retrieved
    * \param[in] writer Writer instance for writing column values out
    * \param[in] stream CUDA stream in which this operation is executed in
@@ -401,8 +397,6 @@ class HashSet {
     Filter f,
     const FilterValueType* const filter_values_in,
     const index_type num_in,
-    key_type* keys_out,
-    FilterValueType* filter_values_out,
     int* counter,
     Writer writer,
     cudaStream_t stream                           = cudaStreamDefault,
@@ -419,8 +413,6 @@ class HashSet {
         f,
         filter_values_in,
         num_in,
-        keys_out,
-        filter_values_out,
         counter,
         writer,
         *this,
