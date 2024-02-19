@@ -16,14 +16,10 @@ The following modifications have been made to the base `warpcore` library in thi
   defined similarly.
 - `SingleValueHashTable::insert_if()`, `SingleValueHashTable::retrieve_write()` and 
   `SingleValueHashTable::retrieve_write_if()` are also implemented.
-- `HashSet::insert_if()` is implemented.
-- TODO: `HashSet::retrieve_write()`, 
-  `HashSet::retrieve_write_if()`.
+- `HashSet::insert_if()`, `HashSet::retrieve_write()`, and `HashSet::retrieve_write_if()` are 
+  implemented.
 
-The goal is to eliminate the need to write custom kernels for hash table 
-operations curated for a specific SQL query. The exception is hash join 
-pipelining, but I have found that in cases of high selectivity, the thread 
-divergence caused by pipelining is not amortized by the lack of materialization.
+The goal is to eliminate the need to write hash table kernel operations customized to specific SQL queries. The exception is hash join pipelining, but I have found that in cases of high selectivity, the thread divergence caused by pipelining is not amortized by the lack of materialization. The underlying implementation details are unaltered.
 
 Below you will find the original README.
 

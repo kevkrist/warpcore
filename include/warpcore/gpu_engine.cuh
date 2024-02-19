@@ -223,6 +223,81 @@ GLOBALQUALIFIER void insert_if(const typename Core::key_type* const keys_in,
   }
 }
 
+namespace hash_set {
+template <class Core, typename Writer, class StatusHandler = defaults::status_handler_t>
+GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in,
+                                    const index_t num_in,
+                                    typename Core::key_type* const keys_out,
+                                    int* counter,
+                                    Writer writer,
+                                    const Core core,
+                                    const index_t probing_length = defaults::probing_length(),
+                                    typename StatusHandler::base_type* const status_out = nullptr)
+{
+  const index_t tid = helpers::global_thread_id();
+  const index_t gid = tid / Core::cg_size();
+  const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
+
+  if (gid < num_in) {
+    const auto key = keys_in[gid];
+    bool found;
+    core.retrieve(key, found, group, probing_length);
+
+    if (found) {
+      if (group.thread_rank() == 0) {
+        auto write_index      = helpers::atomicAggInc(counter);
+        keys_out[write_index] = key;
+        writer(write_index, gid);
+      }
+
+      StatusHandler::handle(status, status_out, gid);
+    }
+  }
+}
+
+template <class Core,
+          typename Filter,
+          typename FilterValueType,
+          typename Writer,
+          class StatusHandler = defaults::status_handler_t>
+GLOBALQUALIFIER void retrieve_write_if(
+  const typename Core::key_type* const keys_in,
+  Filter f,
+  const FilterValueType* const filter_values_in,
+  const index_t num_in,
+  typename Core::key_type* const keys_out,
+  FilterValueType* filter_values_out,
+  int* counter,
+  Writer writer,
+  const Core core,
+  const index_t probing_length                        = defaults::probing_length(),
+  typename StatusHandler::base_type* const status_out = nullptr)
+{
+  const index_t tid = helpers::global_thread_id();
+  const index_t gid = tid / Core::cg_size();
+  const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
+
+  const auto filter_value = filter_values_in[gid];
+  if (gid < num_in && f(filter_value)) {
+    const auto key = keys_in[gid];
+    bool found;
+    core.retrieve(key, found, group, probing_length);
+
+    if (found) {
+      if (group.thread_rank() == 0) {
+        auto write_index      = helpers::atomicAggInc(counter);
+        keys_out[write_index] = key;
+        filter_values_out[write_index] = filter_value;
+        writer(write_index, gid);
+      }
+
+      StatusHandler::handle(status, status_out, gid);
+    }
+  }
+}
+
+}  // namespace hash_set
+
 //--------------------------------------------------------------------------------------------------
 // for Core = SingleValueHashTable
 //--------------------------------------------------------------------------------------------------
@@ -271,9 +346,7 @@ GLOBALQUALIFIER void insert_if(const typename Core::key_type* const keys_in,
 }
 
 // apply filter to values to insert into hash table
-template <class Core,
-          typename Filter,
-          class StatusHandler = defaults::status_handler_t>
+template <class Core, typename Filter, class StatusHandler = defaults::status_handler_t>
 GLOBALQUALIFIER void insert_if(const typename Core::key_type* const keys_in,
                                const typename Core::value_type* const values_in,
                                Filter f,
@@ -287,7 +360,7 @@ GLOBALQUALIFIER void insert_if(const typename Core::key_type* const keys_in,
   const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
 
   const auto value = values_in[gid];
-  if (gid < num_in && f(value) {
+  if (gid < num_in && f(value)) {
     const auto status = core.insert(keys_in[gid], value, group, probing_length);
 
     if (group.thread_rank() == 0) { StatusHandler::handle(status, status_out, gid); }

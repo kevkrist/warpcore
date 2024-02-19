@@ -428,14 +428,13 @@ class SingleValueHashTable {
         keys_in, num_in, keys_out, values_out, counter, writer, *this, probing_length, status_out);
   }
 
-  /*! \brief retrieve a set of keys from the hash table and write out corresponding values if
-   * filter is passed
+  /*! \brief retrieve a set of keys from the hash table and write out values subject to filter
    * \tparam Filter the filter functor to apply to filter_values
    * \tparam FilterValueType the type of filter_values
    * \tparam Writer the functor type for writing out additional columns
    * \tparam StatusHandler handles returned status per key (see \c status_handlers)
    * \param[in] keys_in pointer to keys to retrieve from the hash table
-   * \param[in] f boolean predicate functor to apply to filter values
+   * \param[in] f predicate functor instance to apply to filter values
    * \param[in] filter_values values to which to apply f
    * \param[in] num_in number of keys to retrieve
    * \param[out] keys_out keys retrieved from the hash table
@@ -453,7 +452,7 @@ class SingleValueHashTable {
   HOSTQUALIFIER INLINEQUALIFIER void retrieve_write_if(
     const key_type* const keys_in,
     Filter f,
-    FilterValueType* filter_values,
+    const FilterValueType* const filter_values,
     const index_type num_in,
     key_type* const keys_out,
     value_type* const values_out,

@@ -242,6 +242,8 @@ class HashSet {
   }
 
   /*! \brief insert a set of keys into the hash set
+   * \tparam Filter the functor type for the filter
+   * \tparam FilterValueType the type of the values to filter
    * \tparam StatusHandler handles returned status per key (see \c status_handlers)
    * \param[in] keys_in pointer to keys to insert into the hash set
    * \param[in] f filter functor for filtering based on filter_values
@@ -341,7 +343,90 @@ class HashSet {
         keys_in, num_in, flags_out, *this, probing_length, status_out);
   }
 
-  // TODO: add retrieve_write and retrieve_write_if for HashSet
+  /*! \brief retrieve a set of keys from the hash table and write out corresponding values
+   * \tparam Writer functor / device lambda type for writing column values out
+   * \tparam StatusHandler handles returned status per key (see \c status_handlers)
+   * \param[in] keys_in pointer to keys to retrieve from the hash table
+   * \param[in] num_in number of keys to retrieve
+   * \param[out] keys_out keys retrieved from the hash table
+   * \param[in] counter counter of keys retrieved
+   * \param[in] writer Writer instance for writing column values out
+   * \param[in] stream CUDA stream in which this operation is executed in
+   * \param[in] probing_length maximum number of probing attempts
+   * \param[out] status_out status information (per key)
+   */
+  template <typename Writer, class StatusHandler = defaults::status_handler_t>
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write(
+    const key_type* keys_in,
+    const index_type num_in,
+    key_type* keys_out,
+    int* counter,
+    Writer writer,
+    cudaStream_t stream                           = cudaStreamDefault,
+    index_type probing_length                     = defaults::probing_length(),
+    typename StatusHandler::base_type* status_out = nullptr) const noexcept
+  {
+    static_assert(checks::is_status_handler<StatusHandler>(), "not a valid status handler type");
+
+    if (!is_initialized_) return;
+
+    kernels::hash_set::retrieve_write<HashSet, Writer, StatusHandler>
+      <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
+        keys_in, num_in, keys_out, counter, writer, *this, probing_length, status_out);
+  }
+
+  /*! \brief retrieve a set of keys from the hash table and write out values subject to filter
+   * \tparam Filter filter functor type to apply to filter_values
+   * \tparam FilterValueType the type of filter_values
+   * \tparam Writer functor / device lambda type for writing column values out
+   * \tparam StatusHandler handles returned status per key (see \c status_handlers)
+   * \param[in] keys_in pointer to keys to retrieve from the hash table
+   * \param[in] f predicate functor instance to apply to filter values
+   * \param[in] filter_values_in values to which to apply f
+   * \param[in] num_in number of keys to retrieve
+   * \param[out] keys_out keys retrieved from the hash table
+   * \param[out] filter_values_out filter values corresponding to matched keys
+   * \param[in] counter counter of keys retrieved
+   * \param[in] writer Writer instance for writing column values out
+   * \param[in] stream CUDA stream in which this operation is executed in
+   * \param[in] probing_length maximum number of probing attempts
+   * \param[out] status_out status information (per key)
+   */
+  template <typename Filter,
+            typename FilterValueType,
+            typename Writer,
+            class StatusHandler = defaults::status_handler_t>
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write_if(
+    const key_type* keys_in,
+    Filter f,
+    const FilterValueType* const filter_values_in,
+    const index_type num_in,
+    key_type* keys_out,
+    FilterValueType* filter_values_out,
+    int* counter,
+    Writer writer,
+    cudaStream_t stream                           = cudaStreamDefault,
+    index_type probing_length                     = defaults::probing_length(),
+    typename StatusHandler::base_type* status_out = nullptr) const noexcept
+  {
+    static_assert(checks::is_status_handler<StatusHandler>(), "not a valid status handler type");
+
+    if (!is_initialized_) return;
+
+    kernels::hash_set::retrieve_write_if<HashSet, Filter, FilterValueType, Writer, StatusHandler>
+      <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
+        keys_in,
+        f,
+        filter_values_in,
+        num_in,
+        keys_out,
+        filter_values_out,
+        counter,
+        writer,
+        *this,
+        probing_length,
+        status_out);
+  }
 
   /*! \brief retrieves all elements from the hash set
    * \param[out] keys_out location to store all retrieved keys
