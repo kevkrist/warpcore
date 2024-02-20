@@ -436,7 +436,7 @@ GLOBALQUALIFIER void retrieve_write_if(
   const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
 
   const auto filter_value = filter_values[gid];
-  if (gid < num_in && f(filter_values)) {
+  if (gid < num_in && f(filter_value)) {
     typename Core::value_type value_out;
 
     const auto key    = keys_in[gid];

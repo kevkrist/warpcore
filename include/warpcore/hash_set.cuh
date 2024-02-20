@@ -257,10 +257,10 @@ class HashSet {
             typename FilterValueType,
             class StatusHandler = defaults::status_handler_t>
   HOSTQUALIFIER INLINEQUALIFIER void insert_if(
-    const key_type* keys_in,
+    const key_type* const keys_in,
     Filter f,
     const FilterValueType* const filter_values,
-    index_type num_in,
+    const index_type num_in,
     cudaStream_t stream                           = cudaStreamDefault,
     index_type probing_length                     = defaults::probing_length(),
     typename StatusHandler::base_type* status_out = nullptr) noexcept
@@ -269,7 +269,7 @@ class HashSet {
 
     if (!is_initialized_) return;
 
-    kernels::insert_if<HashSet, StatusHandler>
+    kernels::insert_if<HashSet, Filter, FilterValueType, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
         keys_in, f, filter_values, num_in, *this, probing_length, status_out);
   }
