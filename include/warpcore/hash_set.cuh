@@ -409,15 +409,7 @@ class HashSet {
 
     kernels::hash_set::retrieve_write_if<HashSet, Filter, FilterValueType, Writer, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
-        keys_in,
-        f,
-        filter_values_in,
-        num_in,
-        counter,
-        writer,
-        *this,
-        probing_length,
-        status_out);
+        keys_in, f, filter_values_in, num_in, counter, writer, *this, probing_length, status_out);
   }
 
   /*! \brief retrieves all elements from the hash set
