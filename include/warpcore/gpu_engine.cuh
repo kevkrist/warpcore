@@ -241,11 +241,11 @@ GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in
   if (gid < num_in) {
     const auto key = keys_in[gid];
     bool found;
-    core.retrieve(key, found, group, probing_length);
+    const auto status = core.retrieve(key, found, group, probing_length);
 
     if (found) {
       if (group.thread_rank() == 0) {
-        auto write_index      = helpers::atomicAggInc(counter);
+        auto write_index = helpers::atomicAggInc(counter);
         writer(write_index, gid, key);
       }
 
@@ -278,11 +278,11 @@ GLOBALQUALIFIER void retrieve_write_if(
   if (gid < num_in && f(filter_value)) {
     const auto key = keys_in[gid];
     bool found;
-    core.retrieve(key, found, group, probing_length);
+    const auto status = core.retrieve(key, found, group, probing_length);
 
     if (found) {
       if (group.thread_rank() == 0) {
-        auto write_index      = helpers::atomicAggInc(counter);
+        auto write_index = helpers::atomicAggInc(counter);
         writer(write_index, gid, key, filter_value);
       }
 
@@ -406,7 +406,7 @@ GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in
 
     if (group.thread_rank() == 0) {
       if (!status.has_any()) {
-        auto write_index        = helpers::atomicAggInc(counter);
+        auto write_index = helpers::atomicAggInc(counter);
         writer(write_index, gid, key, value_out);
       }
 
@@ -444,7 +444,7 @@ GLOBALQUALIFIER void retrieve_write_if(
 
     if (group.thread_rank() == 0) {
       if (!status.has_any()) {
-        auto write_index        = helpers::atomicAggInc(counter);
+        auto write_index = helpers::atomicAggInc(counter);
         writer(write_index, gid, key, value_out, filter_value);
       }
 

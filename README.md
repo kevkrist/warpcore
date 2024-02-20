@@ -22,6 +22,8 @@ The goal is to eliminate the need to write hash table kernel operations customiz
 
 Below you will find the original README.
 
+NOTE: There is a bug in the test build (which is also present in the original repo).
+
 **Hashing at the speed of light on modern CUDA-accelerators**
 
 ## Introduction

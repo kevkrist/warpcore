@@ -1,6 +1,8 @@
 #ifndef WARPCORE_CHECKS_CUH
 #define WARPCORE_CHECKS_CUH
 
+#include "tags.cuh"
+
 namespace warpcore
 {
 
