@@ -201,7 +201,6 @@ class SingleValueHashTable {
 
     if (group.thread_rank() == 0 && value_ptr != nullptr) { *value_ptr = value_in; }
 
-    // Remove duplicate key status
     return status - warpcore::Status::duplicate_key();
   }
 
@@ -230,7 +229,8 @@ class SingleValueHashTable {
       atomic_aggregator(value_ptr, value_in);
     }
 
-    return status;
+    // Remove duplicate key status
+    return status - warpcore::Status::duplicate_key();
   }
 
   /*! \brief insert a set of keys into the hash table
