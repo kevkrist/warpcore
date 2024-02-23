@@ -143,7 +143,7 @@ GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in
     if (core.retrieve(key, group)) {
       if (group.thread_rank() == 0) {
         const auto write_index = helpers::atomicAggInc(counter);
-        writer(write_index, gid);
+        writer(write_index, gid, key);
       }
     }
   }
