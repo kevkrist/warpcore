@@ -251,7 +251,6 @@ class BloomFilter {
   HOSTQUALIFIER INLINEQUALIFIER void retrieve_write(
     const key_type* const keys_in,
     const index_type num_in,
-    key_type* keys_out,
     int* counter,
     Writer writer,
     cudaStream_t stream = cudaStreamDefault) const noexcept
@@ -259,8 +258,7 @@ class BloomFilter {
     kernels::bloom_filter::retrieve_write<<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE),
                                             WARPCORE_BLOCKSIZE,
                                             0,
-                                            stream>>>(
-      keys_in, num_in, keys_out, counter, writer, *this);
+                                            stream>>>(keys_in, num_in, counter, writer, *this);
   }
 
   /*! \brief retrieve a set of keys predicated on a filter, and write filtered output out
@@ -282,7 +280,6 @@ class BloomFilter {
     Filter f,
     FilterValueType* filter_values,
     const index_type num_in,
-    key_type* keys_out,
     int* counter,
     Writer writer,
     cudaStream_t stream = cudaStreamDefault) const noexcept
@@ -291,7 +288,7 @@ class BloomFilter {
                                                WARPCORE_BLOCKSIZE,
                                                0,
                                                stream>>>(
-      keys_in, f, filter_values, num_in, keys_out, counter, writer, *this);
+      keys_in, f, filter_values, num_in, counter, writer, *this);
   }
 
   /*! \brief queries and subsequently inserts a key into the bloom filter

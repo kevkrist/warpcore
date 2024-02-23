@@ -130,7 +130,6 @@ GLOBALQUALIFIER void retrieve(const typename Core::key_type* const keys_in,
 template <class Core, typename Writer>
 GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in,
                                     const index_t num_in,
-                                    typename Core::key_type* keys_out,
                                     int* counter,
                                     Writer writer,
                                     const Core core)
@@ -144,7 +143,6 @@ GLOBALQUALIFIER void retrieve_write(const typename Core::key_type* const keys_in
     if (core.retrieve(key, group)) {
       if (group.thread_rank() == 0) {
         const auto write_index = helpers::atomicAggInc(counter);
-        keys_out[write_index]  = key;
         writer(write_index, gid);
       }
     }
@@ -156,7 +154,6 @@ GLOBALQUALIFIER void retrieve_write_if(const typename Core::key_type* const keys
                                        Filter f,
                                        const FilterTypeValue* const filter_values,
                                        const index_t num_in,
-                                       typename Core::key_type* keys_out,
                                        int* counter,
                                        Writer writer,
                                        const Core core)
@@ -165,13 +162,15 @@ GLOBALQUALIFIER void retrieve_write_if(const typename Core::key_type* const keys
   const index_t gid = tid / Core::cg_size();
   const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
 
-  if (gid < num_in && f(filter_values[gid])) {
-    const auto key = keys_in[gid];
-    if (core.retrieve(key, group)) {
-      if (group.thread_rank() == 0) {
-        const auto write_index = helpers::atomicAggInc(counter);
-        keys_out[write_index]  = key;
-        writer(write_index, gid);
+  if (gid < num_in) {
+    const auto filter_value = filter_values[gid];
+    if (f(filter_value)) {
+      const auto key = keys_in[gid];
+      if (core.retrieve(key, group)) {
+        if (group.thread_rank() == 0) {
+          const auto write_index = helpers::atomicAggInc(counter);
+          writer(write_index, gid, filter_value);
+        }
       }
     }
   }
@@ -274,19 +273,22 @@ GLOBALQUALIFIER void retrieve_write_if(
   const index_t gid = tid / Core::cg_size();
   const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
 
-  const auto filter_value = filter_values_in[gid];
-  if (gid < num_in && f(filter_value)) {
-    const auto key = keys_in[gid];
-    bool found;
-    const auto status = core.retrieve(key, found, group, probing_length);
+  if (gid < num_in) {
+    const auto filter_value = filter_values_in[gid];
 
-    if (found) {
-      if (group.thread_rank() == 0) {
-        auto write_index = helpers::atomicAggInc(counter);
-        writer(write_index, gid, key, filter_value);
+    if (f(filter_value)) {
+      const auto key = keys_in[gid];
+      bool found;
+      const auto status = core.retrieve(key, found, group, probing_length);
+
+      if (found) {
+        if (group.thread_rank() == 0) {
+          auto write_index = helpers::atomicAggInc(counter);
+          writer(write_index, gid, key, filter_value);
+        }
+
+        StatusHandler::handle(status, status_out, gid);
       }
-
-      StatusHandler::handle(status, status_out, gid);
     }
   }
 }
@@ -354,11 +356,13 @@ GLOBALQUALIFIER void insert_if(const typename Core::key_type* const keys_in,
   const index_t gid = tid / Core::cg_size();
   const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
 
-  const auto value = values_in[gid];
-  if (gid < num_in && f(value)) {
-    const auto status = core.insert(keys_in[gid], value, group, probing_length);
+  if (gid < num_in) {
+    const auto value = values_in[gid];
+    if (f(value)) {
+      const auto status = core.insert(keys_in[gid], value, group, probing_length);
 
-    if (group.thread_rank() == 0) { StatusHandler::handle(status, status_out, gid); }
+      if (group.thread_rank() == 0) { StatusHandler::handle(status, status_out, gid); }
+    }
   }
 }
 
@@ -435,20 +439,23 @@ GLOBALQUALIFIER void retrieve_write_if(
   const index_t gid = tid / Core::cg_size();
   const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
 
-  const auto filter_value = filter_values[gid];
-  if (gid < num_in && f(filter_value)) {
-    typename Core::value_type value_out;
+  if (gid < num_in) {
+    const auto filter_value = filter_values[gid];
 
-    const auto key    = keys_in[gid];
-    const auto status = core.retrieve(key, value_out, group, probing_length);
+    if (f(filter_value)) {
+      typename Core::value_type value_out;
 
-    if (group.thread_rank() == 0) {
-      if (!status.has_any()) {
-        auto write_index = helpers::atomicAggInc(counter);
-        writer(write_index, gid, key, value_out, filter_value);
+      const auto key    = keys_in[gid];
+      const auto status = core.retrieve(key, value_out, group, probing_length);
+
+      if (group.thread_rank() == 0) {
+        if (!status.has_any()) {
+          auto write_index = helpers::atomicAggInc(counter);
+          writer(write_index, gid, key, value_out, filter_value);
+        }
+
+        StatusHandler::handle(status, status_out, gid);
       }
-
-      StatusHandler::handle(status, status_out, gid);
     }
   }
 }
