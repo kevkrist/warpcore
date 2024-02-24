@@ -201,7 +201,7 @@ class SingleValueHashTable {
 
     if (group.thread_rank() == 0 && value_ptr != nullptr) { *value_ptr = value_in; }
 
-    return status - warpcore::Status::duplicate_key();
+    return status;
   }
 
   /*! \brief aggregates values for given key (values must be properly initialized)
