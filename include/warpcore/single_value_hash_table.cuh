@@ -350,7 +350,7 @@ class SingleValueHashTable {
       const auto hit_mask = group.ballot(hit);
 
       if (hit_mask) {
-        const auto leader = ffs(hit_mask) - 1;
+        const auto leader = ffs(hit_mask) - 1; // extracts leader (as int-like) from bit array
         value_out         = table_[group.shfl(i, leader)].value;
 
         return status_type::none();
