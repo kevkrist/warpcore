@@ -1,6 +1,7 @@
 #ifndef WARPCORE_DEFAULTS_CUH
 #define WARPCORE_DEFAULTS_CUH
 
+#include "base.cuh"
 #include "hashers.cuh"
 #include "probing_schemes.cuh"
 #include "status.cuh"

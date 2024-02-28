@@ -91,6 +91,7 @@ if (WARPCORE_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif (WARPCORE_BUILD_EXAMPLES)
 
+# Hack for intellisense
 if(WARPCORE_ENABLE_INTELLISENSE)
     add_executable(intellisense intellisense.cu)
     target_link_libraries(intellisense PRIVATE warpcore)

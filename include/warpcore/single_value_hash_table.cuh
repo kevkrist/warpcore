@@ -2,6 +2,7 @@
 #define WARPCORE_SINGLE_VALUE_HASH_TABLE_CUH
 
 #include "base.cuh"
+#include "defaults.cuh"
 
 namespace warpcore {
 
@@ -350,7 +351,7 @@ class SingleValueHashTable {
       const auto hit_mask = group.ballot(hit);
 
       if (hit_mask) {
-        const auto leader = ffs(hit_mask) - 1; // extracts leader (as int-like) from bit array
+        const auto leader = ffs(hit_mask) - 1;  // extracts leader (as int-like) from bit array
         value_out         = table_[group.shfl(i, leader)].value;
 
         return status_type::none();
@@ -360,6 +361,47 @@ class SingleValueHashTable {
         status_->atomic_join(status_type::key_not_found());
         return status_type::key_not_found();
       }
+    }
+
+    status_->atomic_join(status_type::probing_length_exceeded());
+    return status_type::probing_length_exceeded();
+  }
+
+  DEVICEQUALIFIER INLINEQUALIFIER status_type template <typename counter_type>
+  retrieve_debug(const key_type key_in,
+                 value_type& value_out,
+                 counter_type& num_iter_out,
+                 const cg::thread_block_tile<cg_size()>& group,
+                 const index_type probing_length = defaults::probing_length()) const noexcept
+  {
+    if (!is_initialized_) return status_type::not_initialized();
+
+    if (!is_valid_key(key_in)) {
+      status_->atomic_join(status_type::invalid_key());
+      return status_type::invalid_key();
+    }
+
+    ProbingScheme iter(capacity(), probing_length, group);
+
+    num_iter_out         = 0;
+    counter_type counter = 1;
+    for (index_type i = iter.begin(key_in, seed_); i != iter.end(); i = iter.next()) {
+      key_type table_key  = table_[i].key;
+      const bool hit      = (table_key == key_in);
+      const auto hit_mask = group.ballot(hit);
+
+      if (hit_mask) {
+        const auto leader = ffs(hit_mask) - 1;  // extracts leader (integral) from bit array
+        value_out         = table_[group.shfl(i, leader)].value;
+        num_iter_out      = counter;
+        return status_type::none();
+      }
+
+      if (group.any(is_empty_key(table_key))) {
+        status_->atomic_join(status_type::key_not_found());
+        return status_type::key_not_found();
+      }
+      ++counter;
     }
 
     status_->atomic_join(status_type::probing_length_exceeded());
@@ -460,10 +502,42 @@ class SingleValueHashTable {
 
     kernels::retrieve_write_if<SingleValueHashTable, Filter, FilterValueType, Writer, StatusHandler>
       <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
+        keys_in, f, filter_values, num_in, counter, writer, *this, probing_length, status_out);
+  }
+
+  template <typename Filter,
+            typename FilterValueType,
+            typename IterCounterType,
+            typename Writer,
+            class StatusHandler = defaults::status_handler_t>
+  HOSTQUALIFIER INLINEQUALIFIER void retrieve_write_if_debug(
+    const key_type* const keys_in,
+    Filter f,
+    const FilterValueType* const filter_values,
+    const index_type num_in,
+    IterCounterType* const num_iter_out,
+    int* counter,
+    Writer writer,
+    cudaStream_t stream                                 = cudaStreamDefault,
+    const index_type probing_length                     = defaults::probing_length(),
+    typename StatusHandler::base_type* const status_out = nullptr) const noexcept
+  {
+    static_assert(checks::is_status_handler<StatusHandler>(), "not a valid status handler type");
+
+    if (!is_initialized_) return;
+
+    kernels::retrieve_write_if_debug<SingleValueHashTable,
+                                     Filter,
+                                     FilterValueType,
+                                     IterCounterType,
+                                     Writer,
+                                     StatusHandler>
+      <<<SDIV(num_in * cg_size(), WARPCORE_BLOCKSIZE), WARPCORE_BLOCKSIZE, 0, stream>>>(
         keys_in,
         f,
         filter_values,
         num_in,
+        num_iter_out,
         counter,
         writer,
         *this,

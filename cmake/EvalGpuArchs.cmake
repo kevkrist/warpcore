@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 ")
   execute_process(
     COMMAND ${CMAKE_CUDA_COMPILER}
-      -std=c++11
+      -std=c++17
       -o ${eval_exe}
       --run
       ${eval_file}

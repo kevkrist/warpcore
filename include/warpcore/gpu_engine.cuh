@@ -1,6 +1,9 @@
 #ifndef WARPCORE_GPU_ENGINE_CUH
 #define WARPCORE_GPU_ENGINE_CUH
 
+#include "base.cuh"
+#include "defaults.cuh"
+
 #include <helpers/cuda_helpers.cuh>
 
 /*! \brief CUDA kernels
@@ -447,6 +450,51 @@ GLOBALQUALIFIER void retrieve_write_if(
 
       const auto key    = keys_in[gid];
       const auto status = core.retrieve(key, value_out, group, probing_length);
+
+      if (group.thread_rank() == 0) {
+        if (!status.has_any()) {
+          auto write_index = helpers::atomicAggInc(counter);
+          writer(write_index, gid, key, value_out, filter_value);
+        }
+
+        StatusHandler::handle(status, status_out, gid);
+      }
+    }
+  }
+}
+
+template <class Core,
+          typename Filter,
+          typename FilterValueType,
+          typename IterCounterType,
+          typename Writer,
+          class StatusHandler = defaults::status_handler_t>
+GLOBALQUALIFIER void retrieve_write_if_debug(
+  const typename Core::key_type* const keys_in,
+  Filter f,
+  const FilterValueType* const filter_values,
+  const index_t num_in,
+  IterCounterType* const num_iter_out,
+  int* counter,
+  Writer writer,
+  const Core core,
+  const index_t probing_length                        = defaults::probing_length(),
+  typename StatusHandler::base_type* const status_out = nullptr)
+{
+  const index_t tid = helpers::global_thread_id();
+  const index_t gid = tid / Core::cg_size();
+  const auto group  = cg::tiled_partition<Core::cg_size()>(cg::this_thread_block());
+
+  if (gid < num_in) {
+    const auto filter_value = filter_values[gid];
+
+    if (f(filter_value)) {
+      typename Core::value_type value_out;
+      IterCounterType num_iter;
+
+      const auto key    = keys_in[gid];
+      const auto status = core.retrieve_debug(key, value_out, num_iter, group, probing_length);
+      num_iter_out[gid] = num_iter;
 
       if (group.thread_rank() == 0) {
         if (!status.has_any()) {
