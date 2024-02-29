@@ -351,7 +351,7 @@ class SingleValueHashTable {
       const auto hit_mask = group.ballot(hit);
 
       if (hit_mask) {
-        const auto leader = ffs(hit_mask) - 1;  // extracts leader (as int-like) from bit array
+        const auto leader = ffs(hit_mask) - 1;
         value_out         = table_[group.shfl(i, leader)].value;
 
         return status_type::none();
@@ -367,10 +367,11 @@ class SingleValueHashTable {
     return status_type::probing_length_exceeded();
   }
 
-  DEVICEQUALIFIER INLINEQUALIFIER status_type template <typename counter_type>
+  template <typename CounterType>
+  DEVICEQUALIFIER INLINEQUALIFIER status_type
   retrieve_debug(const key_type key_in,
                  value_type& value_out,
-                 counter_type& num_iter_out,
+                 CounterType& num_iter_out,
                  const cg::thread_block_tile<cg_size()>& group,
                  const index_type probing_length = defaults::probing_length()) const noexcept
   {
@@ -383,8 +384,8 @@ class SingleValueHashTable {
 
     ProbingScheme iter(capacity(), probing_length, group);
 
-    num_iter_out         = 0;
-    counter_type counter = 1;
+    CounterType num_iter_out = 0;
+    int counter              = 1;
     for (index_type i = iter.begin(key_in, seed_); i != iter.end(); i = iter.next()) {
       key_type table_key  = table_[i].key;
       const bool hit      = (table_key == key_in);
