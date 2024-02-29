@@ -384,8 +384,8 @@ class SingleValueHashTable {
 
     ProbingScheme iter(capacity(), probing_length, group);
 
-    CounterType num_iter_out = 0;
-    int counter              = 1;
+    num_iter_out = 0;
+    int counter  = 1;
     for (index_type i = iter.begin(key_in, seed_); i != iter.end(); i = iter.next()) {
       key_type table_key  = table_[i].key;
       const bool hit      = (table_key == key_in);
