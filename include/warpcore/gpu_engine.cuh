@@ -494,9 +494,9 @@ GLOBALQUALIFIER void retrieve_write_if_debug(
 
       const auto key    = keys_in[gid];
       const auto status = core.retrieve_debug(key, value_out, num_iter, group, probing_length);
-      num_iter_out[gid] = num_iter;
 
       if (group.thread_rank() == 0) {
+        num_iter_out[gid] = num_iter;
         if (!status.has_any()) {
           auto write_index = helpers::atomicAggInc(counter);
           writer(write_index, gid, key, value_out, filter_value);
