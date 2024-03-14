@@ -221,6 +221,11 @@ class BloomFilter {
     return (group.all((slot & bloom_filter_[slot_index]) == slot));
   }
 
+  DEVICEQUALIFIER INLINEQUALIFIER slot_type direct_retrieve(const index_type slot_index)
+  {
+    return bloom_filter_[slot_index];
+  }
+
   /*! \brief retrieve a set of keys
    * \param[in] keys_in pointer to keys
    * \param[in] num_in number of keys
